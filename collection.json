@@ -1,0 +1,2033 @@
+{
+  "info": {
+    "name": "Лабораторная 4 — Spring Security",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Выполнить все запросы по порядку в Collection Runner с включёнными cookies. Каждая проверка содержит ожидаемый HTTP-код. При повторном запуске создаются новые тестовые данные."
+  },
+  "auth": {
+    "type": "basic",
+    "basic": [
+      {
+        "key": "username",
+        "value": "{{librarianEmail}}",
+        "type": "string"
+      },
+      {
+        "key": "password",
+        "value": "{{librarianPassword}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "librarianEmail",
+      "value": "librarian@example.com"
+    },
+    {
+      "key": "librarianPassword",
+      "value": "Librarian123!"
+    }
+  ],
+  "item": [
+    {
+      "name": "01. Получить CSRF",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/auth/csrf",
+        "auth": {
+          "type": "noauth"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.collectionVariables.set(\"csrfToken\", pm.response.json().token);",
+              "const run = Date.now();",
+              "pm.collectionVariables.set(\"run\", run);",
+              "pm.collectionVariables.set(\"readerEmail\", \"reader\" + run + \"@example.com\");",
+              "pm.collectionVariables.set(\"otherEmail\", \"other\" + run + \"@example.com\");"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02. Регистрация без CSRF",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/auth/register",
+        "auth": {
+          "type": "noauth"
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"fullName\": \"Читатель\",\n  \"email\": \"{{readerEmail}}\",\n  \"password\": \"Reader123!\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "03. Неверный CSRF",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRF-TOKEN",
+            "value": "wrong"
+          }
+        ],
+        "url": "{{baseUrl}}/api/auth/register",
+        "auth": {
+          "type": "noauth"
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"fullName\": \"Читатель\",\n  \"email\": \"{{readerEmail}}\",\n  \"password\": \"Reader123!\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "04. Слабый пароль",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRF-TOKEN",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/auth/register",
+        "auth": {
+          "type": "noauth"
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"fullName\": \"Читатель\",\n  \"email\": \"{{readerEmail}}\",\n  \"password\": \"123\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "05. Регистрация без повышения прав",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRF-TOKEN",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/auth/register",
+        "auth": {
+          "type": "noauth"
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"fullName\": \"Читатель\",\n  \"email\": \"{{readerEmail}}\",\n  \"password\": \"Reader123!\",\n  \"role\": \"LIBRARIAN\",\n  \"active\": false\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+              "pm.collectionVariables.set(\"readerId\", pm.response.json().id);",
+              "pm.test(\"Только READER, пароль скрыт\", () => {",
+              "    const data = pm.response.json();",
+              "    pm.expect(data.role).to.eql(\"READER\");",
+              "    pm.expect(data.active).to.eql(true);",
+              "    pm.expect(data).not.to.have.property(\"password\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "06. Повторная регистрация",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRF-TOKEN",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/auth/register",
+        "auth": {
+          "type": "noauth"
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"fullName\": \"Читатель\",\n  \"email\": \"{{readerEmail}}\",\n  \"password\": \"Reader123!\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "07. Другой читатель",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRF-TOKEN",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/auth/register",
+        "auth": {
+          "type": "noauth"
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"fullName\": \"Читатель\",\n  \"email\": \"{{otherEmail}}\",\n  \"password\": \"Reader123!\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+              "pm.collectionVariables.set(\"otherId\", pm.response.json().id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "08. Без входа",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/books",
+        "auth": {
+          "type": "noauth"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 401\", () => pm.response.to.have.status(401));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "09. Неверный пароль",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/books",
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "{{readerEmail}}",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "wrong",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 401\", () => pm.response.to.have.status(401));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Отключённая запись",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/books",
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "alex@example.com",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "Reader123!",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 401\", () => pm.response.to.have.status(401));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11. CSRF библиотекаря",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/auth/csrf"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.collectionVariables.set(\"csrfToken\", pm.response.json().token);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "12. Библиотекарь видит читателей",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/readers"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "13. Читатель видит книги",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/books",
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "{{readerEmail}}",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "Reader123!",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "14. Читатель видит категории",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/categories",
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "{{readerEmail}}",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "Reader123!",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "15. Свой профиль",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/readers/{{readerId}}",
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "{{readerEmail}}",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "Reader123!",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "16. Чужой профиль запрещён",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/readers/{{otherId}}",
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "{{readerEmail}}",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "Reader123!",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "17. Список читателей запрещён",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/readers",
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "{{readerEmail}}",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "Reader123!",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "18. Все выдачи запрещены",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/loans",
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "{{readerEmail}}",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "Reader123!",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "19. Создание категории читателем запрещено",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRF-TOKEN",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/categories",
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "{{readerEmail}}",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "Reader123!",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Запрещено\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "20. Библиотекарю тоже нужен CSRF",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/categories",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Без CSRF\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "21. Создать категорию",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRF-TOKEN",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/categories",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Категория {{run}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+              "pm.collectionVariables.set(\"categoryId\", pm.response.json().id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "22. Изменить категорию",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRF-TOKEN",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/categories/{{categoryId}}",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Изменённая {{run}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "23. Создать книгу",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRF-TOKEN",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/books",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Книга {{run}}\",\n  \"author\": \"Автор\",\n  \"isbn\": \"{{run}}\",\n  \"totalCopies\": 2,\n  \"categoryIds\": [\n    \"{{categoryId}}\"\n  ]\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+              "pm.collectionVariables.set(\"bookId\", pm.response.json().id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "24. Получить книгу",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/books/{{bookId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "25. Изменить книгу",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRF-TOKEN",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/books/{{bookId}}",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Книга {{run}}\",\n  \"author\": \"Новый автор\",\n  \"isbn\": \"{{run}}\",\n  \"totalCopies\": 2,\n  \"categoryIds\": [\n    \"{{categoryId}}\"\n  ]\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "26. Категорию с книгой нельзя удалить",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "X-CSRF-TOKEN",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/categories/{{categoryId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "27. Читатель не может выдавать книги",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRF-TOKEN",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/business/borrow",
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "{{readerEmail}}",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "Reader123!",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"bookId\": \"{{bookId}}\",\n  \"readerId\": \"{{readerId}}\",\n  \"days\": 14\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "28. Выдать книгу",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRF-TOKEN",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/business/borrow",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"bookId\": \"{{bookId}}\",\n  \"readerId\": \"{{readerId}}\",\n  \"days\": 14\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+              "pm.collectionVariables.set(\"loanId\", pm.response.json().id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "29. Повторная выдача запрещена",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRF-TOKEN",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/business/borrow",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"bookId\": \"{{bookId}}\",\n  \"readerId\": \"{{readerId}}\",\n  \"days\": 14\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "30. Книгу с активной выдачей нельзя удалить",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "X-CSRF-TOKEN",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/books/{{bookId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "31. Свои выдачи",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/loans/reader/{{readerId}}",
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "{{readerEmail}}",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "Reader123!",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "32. Чужая выдача запрещена",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/loans/{{loanId}}",
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "{{otherEmail}}",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "Reader123!",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "33. Чужое продление запрещено",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRF-TOKEN",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/business/extend",
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "{{otherEmail}}",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "Reader123!",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"loanId\": \"{{loanId}}\",\n  \"additionalDays\": 3\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "34. Продлить свою выдачу",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRF-TOKEN",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/business/extend",
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "{{readerEmail}}",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "Reader123!",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"loanId\": \"{{loanId}}\",\n  \"additionalDays\": 3\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "35. Списание читателем запрещено",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-CSRF-TOKEN",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/business/write-off/{{loanId}}?replacementCost=200",
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "{{readerEmail}}",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "Reader123!",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "36. Списать книгу, начислить штраф",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-CSRF-TOKEN",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/business/write-off/{{loanId}}?replacementCost=200"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "37. Закрытую выдачу нельзя продлить",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRF-TOKEN",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/business/extend",
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "{{readerEmail}}",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "Reader123!",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"loanId\": \"{{loanId}}\",\n  \"additionalDays\": 3\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "38. Выдача при большом штрафе запрещена",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRF-TOKEN",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/business/borrow",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"bookId\": \"{{bookId}}\",\n  \"readerId\": \"{{readerId}}\",\n  \"days\": 14\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "39. Чужой штраф оплачивать нельзя",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRF-TOKEN",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/business/pay-fine",
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "{{otherEmail}}",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "Reader123!",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"readerId\": \"{{readerId}}\",\n  \"amount\": 200\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "40. Переплата запрещена",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRF-TOKEN",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/business/pay-fine",
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "{{readerEmail}}",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "Reader123!",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"readerId\": \"{{readerId}}\",\n  \"amount\": 201\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "41. Оплатить свой штраф",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRF-TOKEN",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/business/pay-fine",
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "{{readerEmail}}",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "Reader123!",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"readerId\": \"{{readerId}}\",\n  \"amount\": 200\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "42. Нет штрафа для оплаты",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRF-TOKEN",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/business/pay-fine",
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "{{readerEmail}}",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "Reader123!",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"readerId\": \"{{readerId}}\",\n  \"amount\": 1\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "43. Выдать после оплаты",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRF-TOKEN",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/business/borrow",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"bookId\": \"{{bookId}}\",\n  \"readerId\": \"{{readerId}}\",\n  \"days\": 14\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+              "pm.collectionVariables.set(\"loanId\", pm.response.json().id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "44. Возврат читателем запрещён",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-CSRF-TOKEN",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/business/return/{{loanId}}",
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "{{readerEmail}}",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "Reader123!",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "45. Вернуть книгу",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-CSRF-TOKEN",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/business/return/{{loanId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "46. Повторный возврат запрещён",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-CSRF-TOKEN",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/business/return/{{loanId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "47. Пометить просроченные",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-CSRF-TOKEN",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/business/mark-overdue"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "48. Отключить читателя",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-CSRF-TOKEN",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/readers/{{readerId}}/deactivate"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "49. После отключения вход запрещён",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/books",
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "{{readerEmail}}",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "Reader123!",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 401\", () => pm.response.to.have.status(401));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "50. Создать книгу без истории",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRF-TOKEN",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/books",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Удаляемая\",\n  \"author\": \"Автор\",\n  \"totalCopies\": 1\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+              "pm.collectionVariables.set(\"deleteBookId\", pm.response.json().id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "51. Удалить книгу без истории",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "X-CSRF-TOKEN",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/books/{{deleteBookId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 204\", () => pm.response.to.have.status(204));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "52. Создать пустую категорию",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRF-TOKEN",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/categories",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Пустая {{run}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+              "pm.collectionVariables.set(\"deleteCategoryId\", pm.response.json().id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "53. Удалить пустую категорию",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "X-CSRF-TOKEN",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/categories/{{deleteCategoryId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 204\", () => pm.response.to.have.status(204));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "54. Создать читателя через CRUD",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRF-TOKEN",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/readers",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"fullName\": \"CRUD\",\n  \"email\": \"crud{{run}}@example.com\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+              "pm.collectionVariables.set(\"crudReaderId\", pm.response.json().id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "55. Изменить читателя через CRUD",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRF-TOKEN",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/readers/{{crudReaderId}}",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"fullName\": \"Обновлённый\",\n  \"email\": \"crud{{run}}@example.com\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "56. Удалить читателя без выдач",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "X-CSRF-TOKEN",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/readers/{{crudReaderId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 204\", () => pm.response.to.have.status(204));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
